@@ -200,7 +200,7 @@
         // Function that lists containers
         async function executeContainers() {
             setLoading('btn-containers', true);
-            const url = "https://tagmanager.googleapis.com/tagmanager/v2/accounts/6005538282/containers/";
+            const url = "https://tagmanager.googleapis.com/tagmanager/v2/accounts/accountid/containers/";
             try {
                 const response = await fetch(url, { headers: { "Authorization": `Bearer ${"ya29.a0AXeO80So_pPCBfQQWc6kF8UjXnzT5_6WsxwPakNm-4uAJhrWgoGyrYs_i4Pvv-xHWHaGvhqXay34L9wuWvP84m0klJjKOxsyF4w6qzBYERSFrvMoivVYZAHPgqMuqP1IpRY_Mi13aj5qWE1NgtzZEBS6dS7u9QDEpneZVS6kaCgYKAXcSARESFQHGX2MiDaDk8qu_RcvrihyC6qp2kg0175"}` } });
                 if (!response.ok) {
