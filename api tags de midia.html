@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Tag Manager API</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        h1 {
+            color: #202124;
+        }
+
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #1557b0;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        #log-output {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .collapsible {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 5px 0;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .collapsible:hover {
+            background-color: #f1f1f1;
+        }
+
+        .content {
+            padding: 10px;
+            display: none;
+            overflow: auto;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+
+        .content ul {
+            list-style-type: none;
+            padding-left: 20px;
+        }
+
+        .content ul li {
+            margin: 5px 0;
+        }
+
+        .copy-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-left: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .copy-button:hover {
+            background-color: #45a049;
+        }
+
+        .loading {
+            display: inline-block;
+            margin-left: 10px;
+            font-weight: bold;
+            color: #1a73e8;
+        }
+    </style>
+    <script>
+        let containerPathArray = []; // Array with all containers paths within the GTM account
+        let defaultWorkspace = []; // Array with workspaces named "Default Workspace"
+        let workspacePaths = []; // Array with the default workspaces path
+        let tagOutput = []; // Array with all tags that meet the condition
+        let emptyArrayCount = 0; // Counter of empty arrays of empty workspaces
+        let emptyWorkspace = []; // Array with the empty workspaces
+
+        // Function to append logs to the page
+        function logToPage(message, isArray = false, title = "") {
+            const logOutput = document.getElementById('log-output');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+
+            if (isArray) {
+                const collapsible = document.createElement('div');
+                collapsible.className = 'collapsible';
+                collapsible.textContent = title; // Use the provided title
+                collapsible.onclick = function () {
+                    this.classList.toggle('active');
+                    const content = this.nextElementSibling;
+                    content.style.display = content.style.display === 'block' ? 'none' : 'block';
+                };
+
+                const content = document.createElement('div');
+                content.className = 'content';
+
+                // Convert the array to a nested list
+                const list = document.createElement('ul');
+                message.forEach((item, index) => {
+                    const listItem = document.createElement('li');
+                    if (typeof item === 'object' && item !== null) {
+                        listItem.textContent = `Item ${index + 1}:`;
+                        const nestedList = document.createElement('ul');
+                        Object.entries(item).forEach(([key, value]) => {
+                            const nestedItem = document.createElement('li');
+                            nestedItem.textContent = `${key}: ${JSON.stringify(value, null, 2)}`;
+                            nestedList.appendChild(nestedItem);
+                        });
+                        listItem.appendChild(nestedList);
+                    } else {
+                        listItem.textContent = item;
+                    }
+                    list.appendChild(listItem);
+                });
+                content.appendChild(list);
+
+                const copyButton = document.createElement('button');
+                copyButton.className = 'copy-button';
+                copyButton.textContent = 'Copy to Clipboard';
+                copyButton.onclick = function () {
+                    navigator.clipboard.writeText(JSON.stringify(message, null, 2));
+                };
+
+                logEntry.appendChild(collapsible);
+                logEntry.appendChild(content);
+                logEntry.appendChild(copyButton);
+            } else {
+                logEntry.textContent = message;
+            }
+
+            logOutput.appendChild(logEntry);
+            logOutput.scrollTop = logOutput.scrollHeight; // Auto-scroll to the latest log
+        }
+
+        // Function to show loading state
+        function setLoading(buttonId, isLoading) {
+            const button = document.getElementById(buttonId);
+            const loadingSpan = button.querySelector('.loading');
+            if (isLoading) {
+                button.disabled = true;
+                loadingSpan.textContent = 'Loading...';
+            } else {
+                button.disabled = false;
+                loadingSpan.textContent = 'Done!';
+                setTimeout(() => {
+                    loadingSpan.textContent = '';
+                }, 2000); // Clear "Done!" after 2 seconds
+            }
+        }
+
+        // Function that lists containers
+        async function executeContainers() {
+            setLoading('btn-containers', true);
+            const url = "https://tagmanager.googleapis.com/tagmanager/v2/accounts/6005538282/containers/";
+            try {
+                const response = await fetch(url, { headers: { "Authorization": `Bearer ${"ya29.a0AXeO80So_pPCBfQQWc6kF8UjXnzT5_6WsxwPakNm-4uAJhrWgoGyrYs_i4Pvv-xHWHaGvhqXay34L9wuWvP84m0klJjKOxsyF4w6qzBYERSFrvMoivVYZAHPgqMuqP1IpRY_Mi13aj5qWE1NgtzZEBS6dS7u9QDEpneZVS6kaCgYKAXcSARESFQHGX2MiDaDk8qu_RcvrihyC6qp2kg0175"}` } });
+                if (!response.ok) {
+                    throw new Error(`Response status: ${response.status}`);
+                }
+                const containerData = await response.json();
+                logToPage(containerData.container, true, "Container Data");
+
+                containerPathArray = containerData.container.map(container => container.path);
+                logToPage(containerPathArray, true, "Container Path");
+
+            } catch (error) {
+                logToPage('Error: ' + error.message);
+            } finally {
+                setLoading('btn-containers', false);
+            }
+        }
+
+        // Function that lists default workspaces
+        async function executeWorkspaces() {
+            setLoading('btn-workspaces', true);
+            for (const containerPath of containerPathArray) {
+                const url = `https://tagmanager.googleapis.com/tagmanager/v2/${containerPath}/workspaces`;
+
+                try {
+                    const response = await fetch(url, { headers: { "Authorization": `Bearer ${"ya29.a0AXeO80So_pPCBfQQWc6kF8UjXnzT5_6WsxwPakNm-4uAJhrWgoGyrYs_i4Pvv-xHWHaGvhqXay34L9wuWvP84m0klJjKOxsyF4w6qzBYERSFrvMoivVYZAHPgqMuqP1IpRY_Mi13aj5qWE1NgtzZEBS6dS7u9QDEpneZVS6kaCgYKAXcSARESFQHGX2MiDaDk8qu_RcvrihyC6qp2kg0175"}` } });
+                    if (!response.ok) {
+                        throw new Error(`Error accessing ${containerPath}: Status ${response.status}`);
+                    }
+                    const workspaceData = await response.json();
+                    logToPage(workspaceData.workspace, true, "Workspaces");
+
+                    const defaultWorkspacesInContainer = workspaceData.workspace.filter(workspace => workspace.name === "Default Workspace");
+
+                    if (defaultWorkspacesInContainer.length > 0) {
+                        defaultWorkspace.push({
+                            workspaces: defaultWorkspacesInContainer
+                        });
+                    }
+
+                } catch (error) {
+                    logToPage(`Error processing ${containerPath}: ` + error.message);
+                    break;
+                }
+                await new Promise(resolve => setTimeout(resolve, 4100));
+            }
+
+            defaultWorkspace.forEach(container => {
+                container.workspaces.forEach(workspace => {
+                    workspacePaths.push(workspace.path);
+                });
+            });
+
+            logToPage(workspacePaths, true, "Default Workspaces Paths");
+            setLoading('btn-workspaces', false);
+        }
+
+        // Function that lists Tags
+        async function executeTags() {
+            setLoading('btn-tags', true);
+            for (const workspaceArrayPath of workspacePaths) {
+                const url = `https://tagmanager.googleapis.com/tagmanager/v2/${workspaceArrayPath}/tags`;
+
+                try {
+                    const response = await fetch(url, { headers: { "Authorization": `Bearer ${"ya29.a0AXeO80So_pPCBfQQWc6kF8UjXnzT5_6WsxwPakNm-4uAJhrWgoGyrYs_i4Pvv-xHWHaGvhqXay34L9wuWvP84m0klJjKOxsyF4w6qzBYERSFrvMoivVYZAHPgqMuqP1IpRY_Mi13aj5qWE1NgtzZEBS6dS7u9QDEpneZVS6kaCgYKAXcSARESFQHGX2MiDaDk8qu_RcvrihyC6qp2kg0175"}` } });
+                    if (!response.ok) {
+                        throw new Error(`Error accessing ${workspaceArrayPath}: Status ${response.status}`);
+                    }
+
+                    const tagData = await response.json();
+                    logToPage(tagData.tag || [], true, "Tags");
+
+                    const midias = [
+                        "Google Ads", "Facebook", "LinkedIn", "TikTok", "Twitter", "Pinterest", "Snapchat",
+                        "Adobe Analytics", "Mixpanel", "HubSpot", "Hotjar", "Navegg", "AdRoll", "Criteo",
+                        "Yandex", "VWO", "Crazy Egg", "Semrush", "Segment", "Quora", "Unity Ads", "Bing Ads",
+                        "Microsoft Advertising", "Reddit", "Shopify", "Discord", "WeChat", "Baidu", "Alibaba",
+                        "Klarna", "Mailchimp", "Drift", "ActiveCampaign", "Klaviyo", "Zopim", "Zendesk",
+                        "Freshdesk", "Sprout Social", "Hootsuite", "Ahrefs", "Moz", "Serpstat", "GetResponse",
+                        "Sendinblue", "Infusionsoft", "Typeform", "Unbounce", "Instapage", "Leadpages",
+                        "Pipedrive", "Salesforce", "HubSpot CRM", "Zoho CRM", "Bitly", "Evernote", "Asana",
+                        "Trello", "Slack", "Intercom", "ChatGPT", "Notion", "ClickFunnels", "Kajabi",
+                        "Thinkific", "Teachable", "Coursera", "Udemy", "Sizmek", "Bing", "Amazon", "DV360", "Kwanko",
+                        "Blue", "Meta", "Inmaker", "Adsplay", "DGMax", "Floodlight", "iGoal", "FB"
+                    ];
+
+                    const midiaTagsInContainer = (tagData.tag || [])
+                        .filter(tag => tag.name)
+                        .filter(tag => midias.some(rede => new RegExp(rede, "i").test(tag.name)));
+
+                    if (midiaTagsInContainer.length > 0) {
+                        tagOutput.push({
+                            tagsDeMidia: midiaTagsInContainer
+                        });
+                    }
+
+                    if (tagData.length === 0 || tagData == [] || tagData == null || tagData == undefined) {
+                        emptyArrayCount++;
+                        emptyWorkspace.push(workspaceArrayPath);
+                    }
+
+                } catch (error) {
+                    logToPage(`Error processing ${workspaceArrayPath}: ` + error.message);
+                    break;
+                }
+                await new Promise(resolve => setTimeout(resolve, 4100));
+            }
+
+            logToPage(tagOutput, true, "Media Tags");
+            logToPage("Number of Empty Workspaces: " + emptyArrayCount);
+            logToPage("Number of Workspaces with Media Tags: " + tagOutput.length);
+
+            const totalItems = tagOutput.reduce((accumulator, obj) => {
+                return accumulator + (obj.tagsDeMidia ? obj.tagsDeMidia.length : 0);
+            }, 0);
+
+            logToPage("Total Media Tags: " + totalItems);
+            setLoading('btn-tags', false);
+        }
+    </script>
+</head>
+
+<body>
+    <h1>Google Tag Manager API</h1>
+    <button id="btn-containers" onclick="executeContainers()">
+        List Containers <span class="loading"></span>
+    </button>
+    <button id="btn-workspaces" onclick="executeWorkspaces()">
+        List Workspaces <span class="loading"></span>
+    </button>
+    <button id="btn-tags" onclick="executeTags()">
+        List Tags <span class="loading"></span>
+    </button>
+
+    <div id="log-output">
+        <h2>Log Output</h2>
+    </div>
+</body>
+
+</html>
