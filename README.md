@@ -26,3 +26,5 @@ There also are instructions on the code
 Please Contact me if any difficults
 
 api overrall.html (lists all container, all workspaces, all tags)
+api tags de midia.hmtl (list just tags named with Social Media names, like facebook, pintereste, etc)
+api tags.html (list filtered tags, just change the words on 'const filtro=[]')
