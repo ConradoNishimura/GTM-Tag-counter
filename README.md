@@ -28,3 +28,11 @@ Please Contact me if any difficults
 api overrall.html (lists all container, all workspaces, all tags)
 api tags de midia.hmtl (list just tags named with Social Media names, like facebook, pintereste, etc)
 api tags.html (list filtered tags, just change the words on 'const filtro=[]')
+
+# All you can do
+This code serves as a base for various possibilities, dont restrain it just with the actual functions. With this code you can edit to view things like:
+- What workspaces are empty
+- Specific tags
+- Specifics Container
+- Number of specific tags
+And much more of specific points of container, workspaces and tags of your GTM account
